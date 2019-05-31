@@ -2257,6 +2257,16 @@ _ssl__SSLSocket_write_impl(PySSLSocket *self, Py_buffer *b)
     _PyTime_t timeout, deadline = 0;
     int has_timeout;
 
+    if (b->len > INT_MAX) {
+        PyErr_Format(PyExc_OverflowError,
+                     "string longer than %d bytes", INT_MAX);
+        goto error;
+    } else if (b->len == 0) {
+        // `man 3 SSL_write`: "When calling SSL_write() with num=0 bytes to be
+        // sent the behaviour is undefined."
+        return PyLong_FromLong(0);
+    }
+
     if (sock != NULL) {
         if (((PyObject*)sock) == Py_None) {
             _setSSLError("Underlying socket connection gone",
@@ -2264,12 +2274,6 @@ _ssl__SSLSocket_write_impl(PySSLSocket *self, Py_buffer *b)
             return NULL;
         }
         Py_INCREF(sock);
-    }
-
-    if (b->len > INT_MAX) {
-        PyErr_Format(PyExc_OverflowError,
-                     "string longer than %d bytes", INT_MAX);
-        goto error;
     }
 
     if (sock != NULL) {
